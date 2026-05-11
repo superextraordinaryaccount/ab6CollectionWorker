@@ -1,6 +1,6 @@
-package clientmod;
+package enviroment.commands;
 
-import enviroment.commands.Commands;
+import clientmod.InputManager;
 
 public interface CommandWrap {
     Commands create(String arg, InputManager inputManager) throws Exception;

@@ -1,13 +1,8 @@
 package clientmod;
 
-
 import enviroment.commands.*;
-
-
 import java.io.*;
-
 import java.util.Scanner;
-
 public class ClientApp {
 
 
