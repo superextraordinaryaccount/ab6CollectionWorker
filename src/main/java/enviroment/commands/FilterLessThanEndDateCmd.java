@@ -1,7 +1,6 @@
 package enviroment.commands;
 
 import servermod.CollectionManager;
-import clientmod.InputManager;
 
 import java.io.PrintStream;
 import java.time.ZonedDateTime;
@@ -16,10 +15,6 @@ public class FilterLessThanEndDateCmd implements Commands {
 
     @Override
     public void execute(CollectionManager collectionManager, PrintStream ps) {
-        if (args == null) {
-            ps.println("Ошибка: укажите endDate.");
-            return;
-        }
         ZonedDateTime date;
         try {
             date = ZonedDateTime.parse(args);

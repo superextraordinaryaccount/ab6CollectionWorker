@@ -9,11 +9,7 @@ import enviroment.workerclass.Worker;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Scanner;
+import java.util.*;
 
 /**
  * Диспетчер команд клиента.
@@ -22,20 +18,57 @@ import java.util.Scanner;
 public class CommandDisp {
     private final CommandSender sender;
     private final InputManager inputManager;
-    private final Scanner consoleScanner;   // нужен для чтения составных объектов
     private int scriptDepth = 0;
     private static final int MAX_SCRIPT_DEPTH = 10;
-    private Deque<String> history = new ArrayDeque<>(12);
+    private final Deque<String> history = new ArrayDeque<>(12);
+    private final Map<String, CommandWrap> commandMap = new HashMap<>();
 
-    public CommandDisp(CommandSender sender, InputManager inputManager, Scanner consoleScanner) {
+    public CommandDisp(CommandSender sender, InputManager inputManager) {
         this.sender = sender;
         this.inputManager = inputManager;
-        this.consoleScanner = consoleScanner;
+        initCommands();
     }
 
     private void addToHistory(String cmdName) {
         history.addFirst(cmdName);
         if (history.size() > 12) history.removeLast();
+    }
+
+    private void initCommands() {
+        // Команды, отправляемые на сервер
+        commandMap.put("info", (arg, in) -> new InfoCmd());
+        commandMap.put("show", (arg, in) -> new ShowCmd());
+        commandMap.put("clear", (arg, in) -> new ClearCmd());
+        commandMap.put("max_by_end_date", (arg, in) -> new MaxByEndDateCmd());
+//        commandMap.put("history", (arg, in) -> new HistoryCmd()); // если история на сервере
+        commandMap.put("remove_key", (arg, in) -> new RemoveKeyCmd(arg));
+        commandMap.put("update", (arg, in) -> {
+            if (arg == null) throw new IllegalArgumentException("Ошибка: укажите id. Пример: update 5");
+            Worker worker = in.readWorker();
+            return new UpdateCmd(arg, worker);
+        });
+        commandMap.put("insert", (arg, in) -> {
+            String key = (arg != null) ? arg : in.readString("Ошибка: укажите ключ. Пример: insert key123", false);
+            Worker worker = in.readWorker();
+            return new InsertCmd( worker,key);
+        });
+        commandMap.put("remove_greater", (arg, in) -> {
+            Worker threshold = in.readWorker();
+            return new RemoveGreaterCmd(threshold);
+        });
+        commandMap.put("remove_lower", (arg, in) -> {
+            Worker threshold = in.readWorker();
+            return new RemoveLowerCmd(threshold);
+        });
+        commandMap.put("count_by_person", (arg, in) -> {
+            Person person = in.readPerson();
+            return new CountByPersonCmd(person);
+        });
+        commandMap.put("filter_less_than_end_date", (arg, in) -> {
+            if (arg == null) throw new IllegalArgumentException("Требуется дата в формате ISO, " +
+                    "например 2023-12-31T10:15:30+01:00[Europe/Paris]): ");
+            return new FilterLessThanEndDateCmd(arg);
+        });
     }
 
     /**
@@ -48,71 +81,40 @@ public class CommandDisp {
         addToHistory(cmdName);
         String arg = parts.length > 1 ? parts[1] : null;
 
-        try {
-            switch (cmdName) {
+
+        switch (cmdName) {
                 case "help":
                     sendCommand(new HelpCmd());
-                    break;
-                case "info":
-                    sendCommand(new InfoCmd());
-                    break;
-                case "show":
-                    sendCommand(new ShowCmd());
-                    break;
-                case "insert":
-                    String key = (arg != null) ? arg : inputManager.readString("Введите ключ: ", false);
-                    Worker worker = inputManager.readWorker();
-                    sendCommand(new InsertCmd(worker,key));
-                    break;
-                case "update":
-                    if (arg == null) throw new IllegalArgumentException("Требуется id");
-                    Worker updatedWorker = inputManager.readWorker();
-                    sendCommand(new UpdateCmd(arg, updatedWorker));
-                    break;
-                case "remove_key":
-                    if (arg == null) throw new IllegalArgumentException("Требуется ключ");
-                    sendCommand(new RemoveKeyCmd(arg));
-                    break;
-                case "clear":
-                    sendCommand(new ClearCmd());
-                    break;
-                case "remove_greater":
-                    Worker greaterThreshold = inputManager.readWorker();
-                    sendCommand(new RemoveGreaterCmd(greaterThreshold));
-                    break;
-                case "remove_lower":
-                    Worker lowerThreshold = inputManager.readWorker();
-                    sendCommand(new RemoveLowerCmd(lowerThreshold));
-                    break;
-                case "max_by_end_date":
-                    sendCommand(new MaxByEndDateCmd());
-                    break;
-                case "count_by_person":
-                    Person person = inputManager.readPerson();
-                    sendCommand(new CountByPersonCmd(person));
-                    break;
-                case "filter_less_than_end_date":
-                    if (arg == null) throw new IllegalArgumentException("Требуется дата");
-                    sendCommand(new FilterLessThanEndDateCmd(arg));
-                    break;
+                    return;
                 case "history":
                     System.out.println("Последние команды:");
                     history.forEach(cmd -> System.out.println("  " + cmd));
-                    break;   // не отправляем на сервер
+                    return;   // не отправляем на сервер
                 case "execute_script":
                     if (arg == null) throw new IllegalArgumentException("Укажите имя файла");
                     executeScript(arg);
-                    break;
+                    return;
                 case "exit":
                     System.out.println("Завершение клиента.");
                     System.exit(0);
-                    break;
-                default:
-                    System.out.println("Неизвестная команда. Введите help.");
+                    return;
+            }
+        // Остальные команды берём из мапы
+        CommandWrap factory = commandMap.get(cmdName);
+        if (factory == null) {
+            System.out.println("Неизвестная команда. Введите help.");
+            return;
+        }
+
+        try {
+            Commands command = factory.create(arg, inputManager);
+            if (command != null) {
+                sendCommand(command);
             }
         } catch (Exception e) {
             System.out.println("Ошибка: " + e.getMessage());
         }
+
     }
 
     /**

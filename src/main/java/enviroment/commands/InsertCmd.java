@@ -1,7 +1,6 @@
 package enviroment.commands;
 
 import servermod.CollectionManager;
-import clientmod.InputManager;
 import enviroment.workerclass.Worker;
 
 import java.io.PrintStream;
@@ -20,10 +19,8 @@ public class InsertCmd implements Commands {
 
     @Override
     public void execute(CollectionManager collectionManager, PrintStream ps) {
-        if (args == null) {
-            ps.println("Ошибка: укажите ключ. Пример: insert key123");
-            return;}
-            String key = args.trim();
+
+        String key = args.trim();
 
 
         if (collectionManager.isColContainsKey(key)) {

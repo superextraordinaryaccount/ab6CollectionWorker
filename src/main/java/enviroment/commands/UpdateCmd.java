@@ -15,10 +15,6 @@ public class UpdateCmd implements Commands {
 
     @Override
     public void execute(CollectionManager collectionManager, PrintStream ps) {
-        if (args == null) {
-            ps.println("Ошибка: укажите id. Пример: update 5");
-            return;
-        }
         long id;
         try {
             id = Long.valueOf(args.trim());

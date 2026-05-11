@@ -1,4 +1,4 @@
 help
 info
 show
-execute_script C:\Users\Hasee\IdeaProjects\Lab5CollectionWorker\src\recurs.txt
+execute_script C:\Users\Hasee\IdeaProjects\untitled\src\main\resources\recurs.txt
