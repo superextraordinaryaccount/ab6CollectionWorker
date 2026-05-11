@@ -1,0 +1,91 @@
+import enviroment.Request;
+import enviroment.Response;
+import enviroment.commands.Commands;
+import enviroment.commands.HelpCmd;
+import enviroment.commands.InsertCmd;
+import enviroment.commands.ShowCmd;
+import enviroment.workerclass.Worker;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Scanner;
+
+public class CommandDisp {
+    private final CommandSender sender;   // отвечает за отправку на сервер
+    private final InputManager inputManager;
+
+
+    public CommandDisp(CommandSender sender, InputManager inputManager, Scanner consoleScanner) {
+        this.sender = sender;
+        this.inputManager = inputManager;
+
+    }
+
+    public static void dispatch(String line) {
+        String[] parts = line.trim().split("\\s+", 2);
+        String cmdName = parts[0].toLowerCase();
+        String arg = parts.length > 1 ? parts[1] : null;
+
+        switch (cmdName) {
+            case "exit":
+                System.out.println("Завершение клиента.");
+                System.exit(0);
+                break;
+            case "execute_script":
+                if (arg == null) {
+                    System.out.println("Ошибка: укажите имя файла.");
+                } else {
+                    executeScript(arg);
+                }
+                break;
+            case "insert":
+                // Запрашиваем ключ и Worker
+                String key = arg != null ? arg : inputManager.readString("Введите ключ: ", true);
+                Worker worker = inputManager.readWorker();
+                Commands command = new InsertCmd(worker,key);
+                sendAndReceive(command);
+                break;
+            case "show":
+                sendAndReceive(new ShowCmd());
+                break;
+            case "help":
+                sendAndReceive(new HelpCmd());
+                break;
+            default:
+                System.out.println("Неизвестная команда. Введите help.");
+        }
+    }
+
+    private void executeScript(String fileName) {
+        File file = new File(fileName);
+        if (!file.exists() || !file.canRead()) {
+            System.out.println("Ошибка: файл не существует или недоступен для чтения.");
+            return;
+        }
+        try (Scanner fileScanner = new Scanner(file)) {
+            while (fileScanner.hasNextLine()) {
+                String line = fileScanner.nextLine();
+                if (line.trim().isEmpty()) continue;
+                System.out.println("> " + line);
+                dispatch(line); // рекурсивный вызов того же диспетчера
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("Ошибка: файл не найден.");
+        }
+    }
+
+    private void sendAndReceive(Commands command) {
+        try {
+            Response response = sender.send(new Request(command));
+            System.out.println(response.getMessage());
+            if (response.getWorkers() != null) {
+                response.getWorkers().forEach(System.out::println);
+            }
+        } catch (IOException e) {
+            System.out.println("Ошибка связи с сервером: " + e.getMessage());
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

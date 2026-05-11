@@ -1,0 +1,136 @@
+package clientmod;
+
+import enviroment.Request;
+import enviroment.Response;
+import enviroment.commands.*;
+import enviroment.workerclass.Worker;
+
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.util.Iterator;
+import java.util.Scanner;
+
+public class ClientApp {
+    private static final int SERVER_PORT = 8888;
+    private static final int TIMEOUT = 5000; // мс
+    private static final int MAX_RETRIES = 3;
+    private static final Scanner consoleScanner;
+
+    public ClientApp(Scanner consoleScanner) {
+        this.consoleScanner = consoleScanner;
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        String host = "localhost";
+        InetSocketAddress serverAddr = new InetSocketAddress(host, SERVER_PORT);
+        InputManager inputManager = new InputManager(new Scanner(System.in));
+
+        try (DatagramChannel channel = DatagramChannel.open()) {
+            channel.configureBlocking(false);
+            Selector selector = Selector.open();
+            channel.register(selector, SelectionKey.OP_WRITE); // сначала отправка
+
+            while (true) {
+                System.out.print("> ");
+                String userLine = inputManager.readString("> ",true); // читаем команду
+                if (userLine == null) continue;
+                String[] parts = userLine.trim().split("\\s+", 2);
+                String cmdName = parts[0].toLowerCase();
+                String arg = parts.length > 1 ? parts[1] : null;
+
+                Commands command = null;
+                // Создание команды на основе ввода
+                switch (cmdName) {
+                    case "exit":
+                        System.out.println("Завершение клиента.");
+                        System.exit(0);
+                        break;
+                    case "execute_script":
+                        if (arg == null) {
+                            System.out.println("Ошибка: укажите имя файла.");
+                        } else {
+                            executeScript(arg);
+                        }
+                        break;
+                    case "insert":
+                        // Запрашиваем ключ и Worker
+                        String key = arg != null ? arg : inputManager.readString("Введите ключ: ", true);
+                        Worker worker = inputManager.readWorker();
+                        Commands command = new InsertCmd(worker,key);
+                        sendAndReceive(command);
+                        break;
+                    case "show":
+                        sendAndReceive(new ShowCmd());
+                        break;
+                    case "help":
+                        command=new HelpCmd();
+                        break;
+                    default:
+                        System.out.println("Неизвестная команда. Введите help.");
+                }
+
+
+                Request request = new Request(command);
+                // сериализация
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                    oos.writeObject(request);
+                }
+                byte[] data = baos.toByteArray();
+                ByteBuffer sendBuf = ByteBuffer.wrap(data);
+
+                // отправка с повторными попытками
+                boolean sent = false;
+                for (int attempt = 0; attempt < MAX_RETRIES && !sent; attempt++) {
+                    channel.send(sendBuf, serverAddr);
+                    sendBuf.rewind();
+                    // ожидание ответа с таймаутом
+                    channel.register(selector, SelectionKey.OP_READ);
+                    long start = System.currentTimeMillis();
+                    while (System.currentTimeMillis() - start < TIMEOUT) {
+                        if (selector.select(TIMEOUT) > 0) {
+                            Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+                            while (it.hasNext()) {
+                                SelectionKey key = it.next();
+                                it.remove();
+                                if (key.isReadable()) {
+                                    ByteBuffer recvBuf = ByteBuffer.allocate(65507);
+                                    DatagramChannel ch = (DatagramChannel) key.channel();
+                                    SocketAddress from = ch.receive(recvBuf);
+                                    if (from != null && from.equals(serverAddr)) {
+                                        recvBuf.flip();
+                                        try (ObjectInputStream ois = new ObjectInputStream(
+                                                new ByteArrayInputStream(recvBuf.array(), 0, recvBuf.limit()))) {
+                                            Response response = (Response) ois.readObject();
+                                            System.out.println(response.getMessage());
+                                            if (response.getSortedWorkers() != null) {
+                                                response.getSortedWorkers().forEach(w -> System.out.println(w));
+                                            }
+                                            sent = true;
+                                            break;
+                                        } catch (ClassNotFoundException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    }
+                                }
+                            }
+                            if (sent) break;
+                        }
+                    }
+                    if (!sent && attempt < MAX_RETRIES - 1) {
+                        System.out.println("Таймаут, повторная отправка...");
+                    }
+                    channel.register(selector, SelectionKey.OP_WRITE);
+                }
+                if (!sent) {
+                    System.out.println("Сервер недоступен. Попробуйте позже.");
+                }
+            }
+        }
+    }
+}
