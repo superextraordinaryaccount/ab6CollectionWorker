@@ -29,7 +29,6 @@ public class FileManager {
         Hashtable<String, Worker> loaded = new Hashtable<>();
         if (filename == null) {
             System.err.println("Имя файла не задано.");
-            return loaded;
         } else {
             try (Scanner scanner = new Scanner(new File(filename))) {
                 while (scanner.hasNextLine()) {
@@ -48,8 +47,8 @@ public class FileManager {
             } catch (FileNotFoundException e) {
                 System.err.println("Файл не найден: " + filename + ", будет создан при сохранении.");
             }
-            return loaded;
         }
+        return loaded;
     }
 
     /**

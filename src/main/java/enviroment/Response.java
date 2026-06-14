@@ -27,12 +27,4 @@ public class Response implements Serializable {
         return workers;
     }
 
-    // Удобный метод для получения отсортированных работников (если нужна сортировка на клиенте)
-    // Но лучше, чтобы сервер возвращал уже отсортированный список.
-    public List<Worker> getSortedWorkers() {
-        if (workers == null) return null;
-        // Сортировка по зарплате (или по id) – можно сделать на клиенте, но лучше на сервере
-        workers.sort(java.util.Comparator.comparingLong(Worker::getSalary));
-        return workers;
-    }
 }

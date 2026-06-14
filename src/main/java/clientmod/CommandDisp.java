@@ -40,7 +40,6 @@ public class CommandDisp {
         commandMap.put("show", (arg, in) -> new ShowCmd());
         commandMap.put("clear", (arg, in) -> new ClearCmd());
         commandMap.put("max_by_end_date", (arg, in) -> new MaxByEndDateCmd());
-//        commandMap.put("history", (arg, in) -> new HistoryCmd()); // если история на сервере
         commandMap.put("remove_key", (arg, in) -> new RemoveKeyCmd(arg));
         commandMap.put("update", (arg, in) -> {
             if (arg == null) throw new IllegalArgumentException("Ошибка: укажите id. Пример: update 5");
@@ -145,7 +144,7 @@ public class CommandDisp {
         }
         File file = new File(fileName);
         if (!file.exists() || !file.canRead()) {
-            System.out.println("Ошибка: файл не существует или недоступен для чтения.");
+            System.out.println("Ошибка: файл не существует или он недоступен для чтения.");
             return;
         }
         try (Scanner fileScanner = new Scanner(file)) {

@@ -8,7 +8,8 @@ import java.io.PrintStream;
  * Команда help - выдаёт списочную и справочную информации
  */
 public class HelpCmd implements Commands {
-
+    private transient String secret = "qwerty";
+//Как не отправлять на сервер некие поля, аннотация, слово,private; Exrernaliziable
     @Override
     public void execute(CollectionManager collectionManager, PrintStream ps) {
         ps.println(""" 

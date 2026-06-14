@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 public class ServerApp {
     private static final Logger logger = LoggerFactory.getLogger(ServerApp.class);
     private static final int PORT = 8888;
+    private static final RateLimiter rateLimiter = new RateLimiter(10);
 
     public static void main(String[] args) throws IOException {
         // инициализация менеджеров
@@ -27,13 +28,15 @@ public class ServerApp {
         collectionManager.getCollection().putAll(fileManager.load());
         collectionManager.updateMaxId();
 
-        // хук для сохранения при завершении
+        // хук для сохранения и остановки rateLimiter при завершении
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 fileManager.save(collectionManager.getCollection());
                 logger.info("Коллекция сохранена перед выходом.");
             } catch (IOException e) {
                 logger.error("Ошибка сохранения: {}", e.getMessage());
+            } finally {
+                rateLimiter.shutdown(); // остановка очистителя RateLimiter
             }
         }));
 
@@ -60,13 +63,26 @@ public class ServerApp {
                         buffer.clear();
                         SocketAddress clientAddr = ch.receive(buffer);
                         if (clientAddr != null) {
+                            if (!rateLimiter.allowRequest(clientAddr)) {
+                                // Превышен лимит – игнорируем запрос
+                                logger.warn("Превышен лимит запросов от клиента {}", clientAddr);
+                                Response errorResponse = new Response(" Превышен лимит запросов. Ваши запросы " +
+                                        "не будут выполнятся. Подождите немного, пожалуйста");
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                                    oos.writeObject(errorResponse);
+                                }
+                                channel.send(ByteBuffer.wrap(baos.toByteArray()), clientAddr);
+                                continue;
+                            }
+
                             buffer.flip();
                             try (ObjectInputStream ois = new ObjectInputStream(
                                     new ByteArrayInputStream(buffer.array(), 0, buffer.limit()))) {
                                 Request request = (Request) ois.readObject();
                                 logger.info("Получена команда: {} от {}", request.getCommand().getName(), clientAddr);
 
-                                // обработка
+                                // обработка, получение ответа из ommandHandler
                                 Response response = handler.handle(request.getCommand());
 
                                 // отправка ответа

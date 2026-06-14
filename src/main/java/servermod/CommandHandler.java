@@ -6,8 +6,6 @@ import enviroment.commands.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 
 public class CommandHandler {
@@ -24,7 +22,7 @@ public class CommandHandler {
             command.execute(collectionManager, ps);
             ps.flush();
             String message = baos.toString();
-            // Если команда требует отправки отсортированной коллекции
+            // команда требует отправки отсортированной коллекции
             List<Worker> workers = null;
             if (command instanceof ShowCmd || command instanceof FilterLessThanEndDateCmd ) {
                 workers = collectionManager.getSortedBySalary();

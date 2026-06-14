@@ -13,8 +13,8 @@ import java.nio.channels.Selector;
 import java.util.Iterator;
 
 /**
- * Отправляет команды на сервер и получает ответы.
- * Использует UDP, неблокирующий режим, таймауты и повторные попытки.
+ * РћС‚РїСЂР°РІР»СЏРµС‚ РєРѕРјР°РЅРґС‹ РЅР° СЃРµСЂРІРµСЂ Рё РїРѕР»СѓС‡Р°РµС‚ РѕС‚РІРµС‚С‹.
+ * РСЃРїРѕР»СЊР·СѓРµС‚ UDP, РЅРµР±Р»РѕРєРёСЂСѓСЋС‰РёР№ СЂРµР¶РёРј, С‚Р°Р№РјР°СѓС‚С‹ Рё РїРѕРІС‚РѕСЂРЅС‹Рµ РїРѕРїС‹С‚РєРё.
  */
 public class CommandSender {
     private final InetSocketAddress serverAddress;
@@ -28,10 +28,10 @@ public class CommandSender {
     }
 
     /**
-     * Отправляет команду на сервер и возвращает ответ.
-     * @param request запрос с командой
-     * @return ответ сервера
-     * @throws IOException если ошибка ввода-вывода или сервер недоступен
+     * РћС‚РїСЂР°РІР»СЏРµС‚ РєРѕРјР°РЅРґСѓ РЅР° СЃРµСЂРІРµСЂ Рё РІРѕР·РІСЂР°С‰Р°РµС‚ РѕС‚РІРµС‚.
+     * @param request Р·Р°РїСЂРѕСЃ СЃ РєРѕРјР°РЅРґРѕР№
+     * @return РѕС‚РІРµС‚ СЃРµСЂРІРµСЂР°
+     * @throws IOException РµСЃР»Рё РѕС€РёР±РєР° РІРІРѕРґР°-РІС‹РІРѕРґР° РёР»Рё СЃРµСЂРІРµСЂ РЅРµРґРѕСЃС‚СѓРїРµРЅ
      */
     public Response send(Request request) throws IOException, ClassNotFoundException {
         byte[] requestData = serialize(request);
@@ -40,10 +40,10 @@ public class CommandSender {
         try (DatagramChannel channel = DatagramChannel.open()) {
             channel.configureBlocking(false);
             Selector selector = Selector.open();
-            channel.register(selector, SelectionKey.OP_WRITE); // сначала отправка
+            channel.register(selector, SelectionKey.OP_WRITE); // СЃРЅР°С‡Р°Р»Р° РѕС‚РїСЂР°РІРєР°, Р·Р°РїРёСЃСЊ РІ РєР°РЅР°Р» РґР°РЅРЅС‹С… РёР· Р±СѓС„РµСЂР°
 
             for (int attempt = 0; attempt < maxRetries; attempt++) {
-                // Отправка
+                // РћС‚РїСЂР°РІРєР°
                 selector.select();
                 Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
                 while (keys.hasNext()) {
@@ -51,13 +51,13 @@ public class CommandSender {
                     keys.remove();
                     if (key.isWritable()) {
                         channel.send(sendBuffer, serverAddress);
-                        sendBuffer.rewind(); // подготовить для возможной повторной отправки
-                        // переключиться на чтение
-                        channel.register(selector, SelectionKey.OP_READ);
+                        sendBuffer.rewind(); // РїРѕРґРіРѕС‚РѕРІРёС‚СЊ РґР»СЏ РІРѕР·РјРѕР¶РЅРѕР№ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРё
+                        // РїРµСЂРµРєР»СЋС‡РёС‚СЊСЃСЏ РЅР° С‡С‚РµРЅРёРµ
+                        channel.register(selector, SelectionKey.OP_READ);// С‚РµРїРµСЂСЊ С‡С‚РµРЅРёРµ РёР· РєР°РЅР°Р»Р° РІ Р±СѓС„РµСЂ
                     }
                 }
 
-                // Ожидание ответа с таймаутом
+                // РћР¶РёРґР°РЅРёРµ РѕС‚РІРµС‚Р° СЃ С‚Р°Р№РјР°СѓС‚РѕРј
                 long startTime = System.currentTimeMillis();
                 ByteBuffer recvBuffer = ByteBuffer.allocate(65507);
                 SocketAddress from = null;
@@ -68,7 +68,7 @@ public class CommandSender {
                             SelectionKey key = it.next();
                             it.remove();
                             if (key.isReadable()) {
-                                from = ((DatagramChannel) key.channel()).receive(recvBuffer);
+                                from = ((DatagramChannel) key.channel()).receive(recvBuffer);//РґР°РЅРЅС‹Рµ Р·Р°РїРёСЃС‹РІР°СЋС‚СЃСЏ РІ Р±СѓС„С„
                                 if (from != null && from.equals(serverAddress)) {
                                     recvBuffer.flip();
                                     Response response = deserialize(recvBuffer);
@@ -79,17 +79,17 @@ public class CommandSender {
                         }
                     }
                 }
-                // Если ответа нет, пробуем снова
+                // Р•СЃР»Рё РѕС‚РІРµС‚Р° РЅРµС‚, РїСЂРѕР±СѓРµРј СЃРЅРѕРІР°
                 if (attempt < maxRetries - 1) {
-                    System.out.println("Таймаут, повторная отправка (" + (attempt + 1) + "/" + maxRetries + ")...");
-                    // перерегистрируем на запись для повторной отправки
+                    System.out.println("РўР°Р№РјР°СѓС‚, РїРѕРІС‚РѕСЂРЅР°СЏ РѕС‚РїСЂР°РІРєР° (" + (attempt + 1) + "/" + maxRetries + ")...");
+                    // РїРµСЂРµСЂРµРіРёСЃС‚СЂРёСЂСѓРµРј РЅР° Р·Р°РїРёСЃСЊ РґР»СЏ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРё
                     channel.register(selector, SelectionKey.OP_WRITE);
                 } else {
-                    throw new IOException("Сервер не ответил после " + maxRetries + " попыток");
+                    throw new IOException("РЎРµСЂРІРµСЂ РЅРµ РѕС‚РІРµС‚РёР» РїРѕСЃР»Рµ " + maxRetries + " РїРѕРїС‹С‚РѕРє");
                 }
             }
         }
-        throw new IOException("Не удалось получить ответ от сервера");
+        throw new IOException("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РѕС‚РІРµС‚ РѕС‚ СЃРµСЂРІРµСЂР°");
     }
 
     private byte[] serialize(Request request) throws IOException {
@@ -98,6 +98,9 @@ public class CommandSender {
             oos.writeObject(request);
             oos.flush();
         }
+
+        ///  Stream q = collection.stream().filter(customSort()).map(...)
+        ///  Long w = q.max()
         return baos.toByteArray();
     }
 

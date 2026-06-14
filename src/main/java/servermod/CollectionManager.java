@@ -16,13 +16,6 @@ public class CollectionManager {
     private final Hashtable<String, Worker> collection = new Hashtable<>();
     private final LocalDate initializationDate = LocalDate.now();
     private long currentMaxId = 0;
-
-
-    public CollectionManager() {
-
-
-    }
-
     /**
      * Возвращает коллекцию.
      */
@@ -49,12 +42,12 @@ public class CollectionManager {
      * Вызывается после загрузки.
      */
     public void updateMaxId() {
-
        currentMaxId = collection.values().isEmpty() ? 0:
-               collection.values().stream().mapToLong(Worker::getId).max().getAsLong();
-
+               collection.values().stream()
+                       .mapToLong(Worker::getId)
+                       .max()
+                       .getAsLong();
     }
-
 
     /**
      * Добавляет элемент по ключу, устанавливая ему сгенерированный id и текущую дату.
